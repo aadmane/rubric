@@ -300,7 +300,6 @@
   <!-- TAB 1: OVERVIEW -->
   <section id="tab-overview" class="tab-panel active" role="tabpanel">
     <div class="kpi-grid" id="kpiGrid"></div>
-    <div class="kpi-grid" id="currGrid" style="margin-top:-6px"></div>
 
     <div class="grid-2">
       <div class="card col-7">
@@ -637,11 +636,6 @@ function getFilteredRecords() {
 }
 
 function renderKPIs(st) {
-  let bestIdx = 0, lowIdx = 0;
-  st.pcts.forEach((p, i) => {
-    if (p > st.pcts[bestIdx]) bestIdx = i;
-    if (p < st.pcts[lowIdx]) lowIdx = i;
-  });
   const delta = (st.overallPct - BASELINE.overallPct) * 100;
   const deltaStr = Math.abs(delta) < 0.05 ? "At overall baseline" : `${delta > 0 ? "+" : ""}${delta.toFixed(1)} pp vs. baseline`;
 
@@ -655,21 +649,6 @@ function renderKPIs(st) {
       <div class="kpi-label">Overall Score</div>
       <div class="kpi-value">${fmtPct(st.overallPct)}</div>
       <div class="kpi-sub">${st.overallMean20.toFixed(2)} / 20.00 · ${deltaStr}</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Strongest Competency</div>
-      <div class="kpi-value">${fmtPct(st.pcts[bestIdx])}</div>
-      <div class="kpi-sub">${COMP_LABELS[bestIdx]} (${st.means[bestIdx].toFixed(2)}/4)</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Focus Area Competency</div>
-      <div class="kpi-value">${fmtPct(st.pcts[lowIdx])}</div>
-      <div class="kpi-sub">${COMP_LABELS[lowIdx]} (${st.means[lowIdx].toFixed(2)}/4)</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Needs Improvement (L1)</div>
-      <div class="kpi-value">${fmtPct(st.l1Rate)}</div>
-      <div class="kpi-sub">Share of Level 1 ratings across 5 competencies</div>
     </div>
   `;
 }
@@ -1158,48 +1137,6 @@ function renderTracker() {
   `).join("");
 }
 
-function renderCurrCards() {
-  const baseRows = DATA.records.filter(r =>
-    (state.grade === "ALL" || r.g === state.grade) &&
-    (state.district === "ALL" || r.d === state.district) &&
-    (state.month === "ALL" || r.m === state.month) &&
-    (state.ic === "ALL" || r.ic === state.ic)
-  );
-  const byCurr = new Map();
-  for (const r of baseRows) {
-    if (!byCurr.has(r.c)) byCurr.set(r.c, { n: 0, total: 0, donors: new Set() });
-    const item = byCurr.get(r.c);
-    item.n += r.n;
-    item.total += r.sum.reduce((a, b) => a + b, 0);
-    item.donors.add(r.dn);
-  }
-  const order = ["STEAM", "ATL", "AI", "Green Skills"];
-  const list = [...byCurr.entries()].sort((a, b) => {
-    const ia = order.indexOf(a[0]), ib = order.indexOf(b[0]);
-    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-  });
-  document.getElementById("currGrid").innerHTML = list.map(([c, v]) => {
-    const pct = v.total / (v.n * 20);
-    const active = state.curriculum === c;
-    return `
-      <div class="kpi-card curr-card" data-curr="${c}" style="cursor:pointer;${active ? 'border-color:var(--primary);background:var(--primary-soft);' : ''}">
-        <div class="kpi-label">Curriculum · ${c}</div>
-        <div class="kpi-value">${fmtPct(pct)}</div>
-        <div class="kpi-sub">${fmtNum(v.n)} students · ${v.donors.size} donor${v.donors.size > 1 ? 's' : ''}</div>
-      </div>
-    `;
-  }).join("");
-  document.querySelectorAll(".curr-card").forEach(el => {
-    el.addEventListener("click", () => {
-      const c = el.getAttribute("data-curr");
-      state.curriculum = (state.curriculum === c) ? "ALL" : c;
-      document.getElementById("fCurriculum").value = state.curriculum;
-      syncDonorAndProjectOptions();
-      update();
-    });
-  });
-}
-
 function update() {
   const rows = getFilteredRecords();
   const st = computeStats(rows);
@@ -1207,7 +1144,6 @@ function update() {
     `Showing ${fmtNum(st.n)} of ${fmtNum(DATA.totalRecords)} Student Assessments · ${st.projects} Projects · ${fmtNum(st.schools)} Schools · ${st.ics} ICs`;
   renderActiveChips();
   renderKPIs(st);
-  renderCurrCards();
   renderCompBars(st);
   renderRadar(st);
   renderProjectBars(rows);

@@ -338,9 +338,10 @@
         <div class="card-header">
           <div>
             <h2 class="card-title">Project-Wise Overall Score %</h2>
-            <div class="card-subtitle">Click any project bar to filter the dashboard</div>
+            <div class="card-subtitle">Color-coded by Project Year · Click any bar or year legend to filter</div>
           </div>
         </div>
+        <div id="projectYearLegend" class="legend" style="margin-bottom:10px;"></div>
         <div id="projectBars" class="bar-list"></div>
       </div>
 
@@ -762,13 +763,27 @@ function renderProjectBars(rows) {
     p, n: v.n, y: v.y, pct: v.total / (v.n * 20)
   })).sort((a, b) => b.pct - a.pct);
 
+  document.getElementById("projectYearLegend").innerHTML = Object.entries(YEAR_COLORS).map(([lbl, col]) => {
+    const active = state.year === lbl;
+    return `<span class="legend-item year-pill-filter" data-year="${lbl}" style="cursor:pointer;padding:2px 7px;border-radius:999px;${active ? 'background:var(--primary-soft);outline:1px solid var(--primary);font-weight:700;color:var(--text);' : ''}"><i class="dot" style="background:${col}"></i>${lbl}</span>`;
+  }).join("");
+
+  document.querySelectorAll("#projectYearLegend .year-pill-filter").forEach(el => {
+    el.addEventListener("click", () => {
+      const y = el.getAttribute("data-year");
+      state.year = (state.year === y) ? "ALL" : y;
+      document.getElementById("fYear").value = state.year;
+      update();
+    });
+  });
+
   document.getElementById("projectBars").innerHTML = list.map(item => {
     const yc = YEAR_COLORS[item.y] || YEAR_COLORS["Unspecified"];
     return `
     <div class="proj-row ${state.project === item.p ? 'selected' : ''}" data-proj="${item.p.replace(/"/g, '&quot;')}" data-tt="<div class='tt-title'>${item.p}</div><div class='tt-row'><span>Project Year:</span><strong>${item.y}</strong></div><div class='tt-row'><span>Overall Score:</span><strong>${fmtPct(item.pct)}</strong></div><div class='tt-row'><span>Students:</span><strong>${fmtNum(item.n)}</strong></div>">
       <div class="proj-name" title="${item.p} (${item.y}, n=${fmtNum(item.n)})"><span class="dot" style="background:${yc};margin-right:6px;"></span>${item.p}</div>
       <div class="proj-track"><div class="proj-fill" style="width:${(item.pct*100).toFixed(1)}%;background:${yc}"></div></div>
-      <div class="proj-val">${fmtPct(item.pct)}</div>
+      <div class="proj-val" style="color:${yc}">${fmtPct(item.pct)}</div>
     </div>
   `;
   }).join("") || `<div class="empty-state">No projects match current filters.</div>`;

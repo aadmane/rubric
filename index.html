@@ -317,14 +317,14 @@
   <div id="activeFilters" class="chips-bar" aria-live="polite"></div>
 
   <nav class="tabs" role="tablist" aria-label="Dashboard Sections">
-    <button class="tab-btn" role="tab" aria-selected="true" data-tab="overview">Overview &amp; Competencies</button>
-    <button class="tab-btn" role="tab" aria-selected="false" data-tab="maturity">Skill Movement &amp; Year Maturity (L3+)</button>
+    <button class="tab-btn" role="tab" aria-selected="true" data-tab="maturity">Skill Movement &amp; Year Maturity (L3+)</button>
+    <button class="tab-btn" role="tab" aria-selected="false" data-tab="overview">Competency &amp; Project Breakdown (L3+)</button>
     <button class="tab-btn" role="tab" aria-selected="false" data-tab="schools">Schools, Districts &amp; ICs</button>
     <button class="tab-btn" role="tab" aria-selected="false" data-tab="tracker">Project Monitoring Tracker (V3)</button>
   </nav>
 
   <!-- TAB 1: OVERVIEW -->
-  <section id="tab-overview" class="tab-panel active" role="tabpanel">
+  <section id="tab-overview" class="tab-panel" role="tabpanel">
     <div class="kpi-grid" id="kpiGrid"></div>
 
     <div class="grid-2">
@@ -408,7 +408,8 @@
   </section>
 
   <!-- TAB 2: SKILL MOVEMENT & YEAR MATURITY (L3+) -->
-  <section id="tab-maturity" class="tab-panel" role="tabpanel">
+  <section id="tab-maturity" class="tab-panel active" role="tabpanel">
+    <div class="kpi-grid" id="kpiGridMaturity"></div>
     <div class="card" style="margin-bottom:20px;">
       <div class="card-header">
         <div>
@@ -684,9 +685,10 @@ function computeStats(rows) {
     }
   }
   const means = sum.map(s => n ? s / n : 0);
-  const pcts = means.map(m => m / 4);
+  const pcts = dist.map(d => n ? (d[2] + d[3]) / n : 0);
   const overallMean20 = sum.reduce((a, b) => a + b, 0) / (n || 1);
-  const overallPct = overallMean20 / 20;
+  const totalL34 = dist.reduce((acc, d) => acc + d[2] + d[3], 0);
+  const overallPct = n ? totalL34 / (n * 5) : 0;
   const totalL1 = dist.reduce((acc, d) => acc + d[0], 0);
   const l1Rate = n ? totalL1 / (n * 5) : 0;
   return { n, means, pcts, dist, overallMean20, overallPct, l1Rate, schools: schools.size, ics: ics.size, projects: projects.size };
@@ -762,20 +764,23 @@ function getFilteredRecords() {
 
 function renderKPIs(st) {
   const delta = (st.overallPct - BASELINE.overallPct) * 100;
-  const deltaStr = Math.abs(delta) < 0.05 ? "At overall baseline" : `${delta > 0 ? "+" : ""}${delta.toFixed(1)} pp vs. baseline`;
+  const deltaStr = Math.abs(delta) < 0.05 ? "At overall L3+ baseline" : `${delta > 0 ? "+" : ""}${delta.toFixed(1)} pp vs. L3+ baseline`;
 
-  document.getElementById("kpiGrid").innerHTML = `
+  const html = `
     <div class="kpi-card">
       <div class="kpi-label">Students Assessed</div>
       <div class="kpi-value">${fmtNum(st.n)}</div>
       <div class="kpi-sub">${st.projects} projects · ${fmtNum(st.schools)} schools · ${st.ics} ICs</div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-label">Overall Score</div>
+      <div class="kpi-label">L3+ Proficiency (Level 3 + 4)</div>
       <div class="kpi-value">${fmtPct(st.overallPct)}</div>
-      <div class="kpi-sub">${st.overallMean20.toFixed(2)} / 20.00 · ${deltaStr}</div>
+      <div class="kpi-sub">Combined Good + Excellent share · ${deltaStr}</div>
     </div>
   `;
+  document.getElementById("kpiGrid").innerHTML = html;
+  const matKpi = document.getElementById("kpiGridMaturity");
+  if (matKpi) matKpi.innerHTML = html;
 }
 
 function renderCompBars(st) {
@@ -787,7 +792,7 @@ function renderCompBars(st) {
       <div class="comp-row">
         <div class="comp-meta">
           <span>${label}</span>
-          <span>Mean: ${st.means[i].toFixed(2)} / 4.00 (${fmtPct(st.pcts[i])})</span>
+          <span>L3+ Combined: <strong>${fmtPct(st.pcts[i])}</strong> (L3: ${p[2].toFixed(1)}% + L4: ${p[3].toFixed(1)}%)</span>
         </div>
         <div class="stacked-bar" title="L1: ${p[0].toFixed(1)}% | L2: ${p[1].toFixed(1)}% | L3: ${p[2].toFixed(1)}% | L4: ${p[3].toFixed(1)}%">
           ${p.map((pct, li) => `<div class="seg seg-${li+1}" style="width:${pct.toFixed(2)}%">${pct >= 7 ? pct.toFixed(0)+'%' : ''}</div>`).join("")}
@@ -833,7 +838,7 @@ function renderRadar(st) {
     const [x, y] = pt(v, i);
     const diff = (v - BASELINE.pcts[i]) * 100;
     const diffStr = `${diff >= 0 ? "+" : ""}${diff.toFixed(1)} pp`;
-    const tt = `<div class='tt-title'>${COMP_LABELS[i]}</div><div class='tt-row'><span>Filtered:</span><strong>${fmtPct(v)} (${st.means[i].toFixed(2)}/4)</strong></div><div class='tt-row'><span>Baseline:</span><strong>${fmtPct(BASELINE.pcts[i])} (${BASELINE.means[i].toFixed(2)}/4)</strong></div><div class='tt-row'><span>Difference:</span><strong>${diffStr}</strong></div>`;
+    const tt = `<div class='tt-title'>${COMP_LABELS[i]}</div><div class='tt-row'><span>Filtered L3+:</span><strong>${fmtPct(v)}</strong></div><div class='tt-row'><span>Baseline L3+:</span><strong>${fmtPct(BASELINE.pcts[i])}</strong></div><div class='tt-row'><span>Difference:</span><strong>${diffStr}</strong></div>`;
     return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5" fill="var(--primary)" stroke="var(--surface)" stroke-width="1.5" data-tt="${tt.replace(/"/g, '&quot;')}" style="cursor:pointer"/>`;
   }).join("");
 
@@ -861,13 +866,13 @@ function renderProjectBars(rows) {
   );
   const byProj = new Map();
   for (const r of baseRows) {
-    if (!byProj.has(r.p)) byProj.set(r.p, { n: 0, total: 0, y: r.y });
+    if (!byProj.has(r.p)) byProj.set(r.p, { n: 0, l34: 0, y: r.y });
     const item = byProj.get(r.p);
     item.n += r.n;
-    item.total += r.sum.reduce((a, b) => a + b, 0);
+    for (let i = 0; i < 5; i++) item.l34 += r.dist[i][2] + r.dist[i][3];
   }
   const list = [...byProj.entries()].map(([p, v]) => ({
-    p, n: v.n, y: v.y, pct: v.total / (v.n * 20)
+    p, n: v.n, y: v.y, pct: v.l34 / (v.n * 5)
   })).sort((a, b) => b.pct - a.pct);
 
   document.getElementById("projectYearLegend").innerHTML = Object.entries(YEAR_COLORS).map(([lbl, col]) => {
@@ -909,13 +914,13 @@ function renderGradeChart(rows) {
   const byGrade = new Map();
   for (const r of rows) {
     if (r.g === "Unspecified") continue;
-    if (!byGrade.has(r.g)) byGrade.set(r.g, { n: 0, total: 0 });
+    if (!byGrade.has(r.g)) byGrade.set(r.g, { n: 0, l34: 0 });
     const item = byGrade.get(r.g);
     item.n += r.n;
-    item.total += r.sum.reduce((a, b) => a + b, 0);
+    for (let i = 0; i < 5; i++) item.l34 += r.dist[i][2] + r.dist[i][3];
   }
   const grades = [...byGrade.entries()]
-    .map(([g, v]) => ({ g, n: v.n, pct: v.total / (v.n * 20) }))
+    .map(([g, v]) => ({ g, n: v.n, pct: v.l34 / (v.n * 5) }))
     .sort((a, b) => Number(a.g) - Number(b.g));
 
   if (!grades.length) {
@@ -987,7 +992,7 @@ function renderTechCurrChart() {
   const order = ["AI", "ATL", "STEAM", "Green Skills"];
   const labels = { "AI": "AI", "ATL": "ATL (Tinkering)", "STEAM": "STEAM", "Green Skills": "Green Skills" };
   const list = [...byCurr.entries()].map(([c, v]) => ({
-    c, label: labels[c] || c, n: v.n, donors: v.donors.size, mean: v.tlSum / v.n, pct: v.tlSum / (v.n * 4), dist: v.dist
+    c, label: labels[c] || c, n: v.n, donors: v.donors.size, pct: (v.dist[2] + v.dist[3]) / v.n, dist: v.dist
   })).sort((a, b) => {
     const ia = order.indexOf(a.c), ib = order.indexOf(b.c);
     return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
@@ -1026,11 +1031,11 @@ function renderTechCurrChart() {
     const isSel = state.curriculum === item.c;
     const fill = isSel ? "var(--primary)" : (state.curriculum === "ALL" ? "var(--l3)" : "var(--border)");
     const lp = item.dist.map(d => ((d / item.n) * 100).toFixed(1));
-    const tt = `<div class='tt-title'>${item.label}</div><div class='tt-row'><span>Tech Literacy:</span><strong>${fmtPct(item.pct)} (${item.mean.toFixed(2)}/4)</strong></div><div class='tt-row'><span>Students · Donors:</span><strong>${fmtNum(item.n)} · ${item.donors}</strong></div><div class='tt-row'><span>L1 / L2 / L3 / L4:</span><span>${lp[0]}% / ${lp[1]}% / ${lp[2]}% / ${lp[3]}%</span></div>`;
+    const tt = `<div class='tt-title'>${item.label}</div><div class='tt-row'><span>Tech Lit L3+:</span><strong>${fmtPct(item.pct)}</strong></div><div class='tt-row'><span>Students · Donors:</span><strong>${fmtNum(item.n)} · ${item.donors}</strong></div><div class='tt-row'><span>L1 / L2 / L3 / L4:</span><span>${lp[0]}% / ${lp[1]}% / ${lp[2]}% / ${lp[3]}%</span></div>`;
     return `
       <g class="tc-bar-group" data-curr="${item.c}" data-tt="${tt.replace(/"/g, '&quot;')}" style="cursor:pointer">
         <rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="8" fill="${fill}" ${isSel ? 'stroke="var(--text)" stroke-width="1.5"' : ''}/>
-        <text x="${cx.toFixed(1)}" y="${(y - 6).toFixed(1)}" text-anchor="middle" fill="var(--text)" font-size="12" font-weight="700">${(item.pct*100).toFixed(1)}% (${item.mean.toFixed(2)}/4)</text>
+        <text x="${cx.toFixed(1)}" y="${(y - 6).toFixed(1)}" text-anchor="middle" fill="var(--text)" font-size="12" font-weight="700">${(item.pct*100).toFixed(1)}% L3+</text>
         <text x="${cx.toFixed(1)}" y="${padT + chartH + 18}" text-anchor="middle" fill="var(--text)" font-size="12" font-weight="700">${item.label}</text>
         <text x="${cx.toFixed(1)}" y="${padT + chartH + 34}" text-anchor="middle" fill="var(--text-muted)" font-size="10.5">n=${fmtNum(item.n)} · ${item.donors} donor${item.donors>1?'s':''}</text>
       </g>
@@ -1071,19 +1076,18 @@ function renderTechLitChart() {
   );
   const byProj = new Map();
   for (const r of baseRows) {
-    if (!byProj.has(r.p)) byProj.set(r.p, { n: 0, valSum: 0, c: r.c, dn: r.dn, y: r.y, dist: [0,0,0,0] });
+    if (!byProj.has(r.p)) byProj.set(r.p, { n: 0, l34: 0, c: r.c, dn: r.dn, y: r.y, dist: [0,0,0,0] });
     const item = byProj.get(r.p);
     item.n += r.n;
     if (ci === -1) {
-      item.valSum += r.sum.reduce((a, b) => a + b, 0);
+      for (let i = 0; i < 5; i++) item.l34 += r.dist[i][2] + r.dist[i][3];
     } else {
-      item.valSum += r.sum[ci];
+      item.l34 += r.dist[ci][2] + r.dist[ci][3];
       for (let l = 0; l < 4; l++) item.dist[l] += r.dist[ci][l];
     }
   }
-  const denom = ci === -1 ? 20 : 4;
   const list = [...byProj.entries()].map(([p, v]) => ({
-    p, c: v.c, dn: v.dn, y: v.y, n: v.n, mean: v.valSum / v.n, pct: v.valSum / (v.n * denom), dist: v.dist
+    p, c: v.c, dn: v.dn, y: v.y, n: v.n, pct: ci === -1 ? v.l34 / (v.n * 5) : v.l34 / v.n, dist: v.dist
   })).sort((a, b) => b.pct - a.pct);
 
   if (!list.length) {
@@ -1092,9 +1096,8 @@ function renderTechLitChart() {
   }
 
   const baseVal = ci === -1 ? BASELINE.overallPct : BASELINE.pcts[ci];
-  const baseMean = ci === -1 ? BASELINE.overallMean20 : BASELINE.means[ci];
   document.getElementById("techLitSub").textContent =
-    `Separate project-wise ${metricName} % (out of ${denom}) · Dashed line = overall baseline (${fmtPct(baseVal)}, ${baseMean.toFixed(2)}/${denom}) · Click any bar to filter`;
+    `Project-wise ${metricName} L3+ % (Level 3 + Level 4) · Dashed line = overall L3+ baseline (${fmtPct(baseVal)}) · Click any bar to filter`;
 
   const W = 1120, H = 330, padL = 46, padR = 20, padT = 28, padB = 96;
   const chartW = W - padL - padR, chartH = H - padT - padB;
@@ -1127,7 +1130,7 @@ function renderTechLitChart() {
       const lp = item.dist.map(d => ((d / item.n) * 100).toFixed(1));
       return `<div class='tt-row'><span>L1 / L2 / L3 / L4:</span><span>${lp[0]}% / ${lp[1]}% / ${lp[2]}% / ${lp[3]}%</span></div>`;
     })();
-    const tt = `<div class='tt-title'>${item.p}</div><div class='tt-row'><span>Curriculum · Donor:</span><strong>${item.c} · ${item.dn}</strong></div><div class='tt-row'><span>Project Year:</span><strong>${item.y}</strong></div><div class='tt-row'><span>${metricName}:</span><strong>${fmtPct(item.pct)} (${item.mean.toFixed(2)}/${denom})</strong></div><div class='tt-row'><span>Assessed:</span><strong>${fmtNum(item.n)}</strong></div>${distHtml}`;
+    const tt = `<div class='tt-title'>${item.p}</div><div class='tt-row'><span>Curriculum · Donor:</span><strong>${item.c} · ${item.dn}</strong></div><div class='tt-row'><span>Project Year:</span><strong>${item.y}</strong></div><div class='tt-row'><span>${metricName} L3+:</span><strong>${fmtPct(item.pct)}</strong></div><div class='tt-row'><span>Assessed:</span><strong>${fmtNum(item.n)}</strong></div>${distHtml}`;
     return `
       <g class="tl-bar-group" data-proj="${item.p.replace(/"/g, '&quot;')}" data-tt="${tt.replace(/"/g, '&quot;')}" style="cursor:pointer">
         <rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="6" fill="${fill}" ${isSel ? 'stroke="var(--text)" stroke-width="1.5"' : ''}/>
